@@ -1,7 +1,9 @@
 import coincurve as cc
+
 from postr.model.event import TextNote
+from postr.user import User
 
 def test_textnote():
-    priv = cc.PrivateKey()
-    note = TextNote.build(priv, "Hello world")
+    user = User()
+    note = user.sign(TextNote(content="Hello World"))
     assert note.verify()

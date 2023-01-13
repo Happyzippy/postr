@@ -7,9 +7,7 @@ from postr.model.event import Event
 
 
 class User(BaseModel):
-    """
-    User class for managing identity and keys
-    """
+    """User class for managing identity and keys"""
 
     identity: Optional[Path] = Field(
         description="Path to .pem/.der certificates or leave empty to generate new identity"
@@ -36,9 +34,11 @@ class User(BaseModel):
 
     @property
     def username(self):
+        """username (public key)"""
         return self._private_key.public_key_xonly.format().hex()
 
     def sign(self, event: Event):
+        """Sign an event"""
         event.pubkey = self.username
         event_data_hash = event.event_data_hash
         event.id = event_data_hash.hex()

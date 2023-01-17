@@ -59,10 +59,20 @@ class SubscriptionResponse(BaseModel):
         return json.dumps(["EVENT", self.subscription_id, self.event])
 
 
-def parse_message(content):
+class ParsingException(Exception):
+    """Base class for parsing errors"""
+
+
+class EventSignatureNotValid(Exception):
+    """Event signature could not be validated"""
+
+
+def parse_message(content, validate_events=True):
     match json.loads(content):
         # Client Requests
         case ["EVENT", event]:
+            if validate_events and event.validate():
+                raise EventSignatureNotValid()
             return EventMessage(event=event)
         case ["REQ", subscription_id, *filters]:
             return RequestMessage(subscription_id=subscription_id, filters=filters)
@@ -76,4 +86,4 @@ def parse_message(content):
             )
         case ["EVENT", subscription_id, event]:
             return SubscriptionResponse(subscription_id=subscription_id, event=event)
-    raise NotImplementedError(f"message could not be parsed, {content}")
+    raise ParsingException(f"message could not be parsed, {content}")

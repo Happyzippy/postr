@@ -16,7 +16,7 @@ class Event(BaseModel):
     id: Optional[_constr_32hex]
     sig: Optional[_constr_64hex]
     pubkey: Optional[_constr_32hex]
-    created_at: PositiveInt = Field(default_factory=lambda: int(time.time()))
+    created_at: int = Field(default_factory=lambda: int(time.time()))
     kind: int
     tags: List[List[str]] = Field(default_factory=list)
     content: str

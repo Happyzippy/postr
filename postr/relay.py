@@ -1,6 +1,6 @@
 import asyncio
 import websockets
-from postr.model.messages import parse_message, ParsingException
+from postr.model.messages import parse_message, ParsingException, Message
 import logging
 
 log = logging.getLogger(__name__)
@@ -17,14 +17,18 @@ class RelayHub:
         return await RelayConnection(relay, self, **kwargs).start()
 
     def publish(self, message, connection=None):
+        # If message retrieve payload
+        if isinstance(message, Message):
+            message = message.payload()
+
+        # Publish
         if connection is None:
-            # Publish on all
+            # on all
             for connection in self.connections:
                 connection.queue.put_nowait(message)
         else:
-            assert (
-                connection in self.connections
-            ), "Connection not in active connections on this hub"
+            if connection not in self.connections:
+                raise KeyError("Connection not in active connections on this hub")
             connection.queue.put_nowait(message)
 
 

@@ -8,7 +8,7 @@ async def controller():
     damus = await hub.connect("wss://relay.damus.io")
 
     hub.publish(
-        postr.RequestMessage(subscription_id="ABC", filters=[postr.Filter()]).payload(),
+        postr.RequestMessage(subscription_id="ABC", filters=postr.Filter()),
         connection=damus,
     )
     while True:

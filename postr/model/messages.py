@@ -1,22 +1,35 @@
 import json
+from abc import ABC, abstractmethod
 
-from pydantic import BaseModel, root_validator
+from pydantic import BaseModel, validator
 from typing import List
 
 from postr.model.event import EventTypes
 from postr.model.filter import Filter
 
 
-class EventMessage(BaseModel):
+class Message(BaseModel, ABC):
+    """Abstract baseclass for messages"""
+
+    @abstractmethod
+    def payload(self) -> str:
+        """Return payload of message as string"""
+
+
+class EventMessage(Message):
     event: EventTypes
 
     def payload(self):
         return json.dumps(["EVENT", self.event])
 
 
-class RequestMessage(BaseModel):
+class RequestMessage(Message):
     subscription_id: str
     filters: List[Filter]
+
+    @validator("filters", pre=True)
+    def allow_single_obj(cls, values):
+        return values if isinstance(values, (list, tuple)) else [values]
 
     def payload(self):
         return json.dumps(
@@ -28,21 +41,21 @@ class RequestMessage(BaseModel):
         )
 
 
-class CloseMessage(BaseModel):
+class CloseMessage(Message):
     subscription_id: str
 
     def payload(self):
         return json.dumps(["CLOSE", self.subscription_id])
 
 
-class NoticeResponse(BaseModel):
+class NoticeResponse(Message):
     message: str
 
     def payload(self):
         return json.dumps(["NOTICE", self.message])
 
 
-class EventMessageResponse(BaseModel):
+class EventMessageResponse(Message):
     message_id: str
     retval: bool
     message: str
@@ -51,7 +64,7 @@ class EventMessageResponse(BaseModel):
         return json.dumps(["OK", self.message_id, self.retval, self.message])
 
 
-class SubscriptionResponse(BaseModel):
+class SubscriptionResponse(Message):
     subscription_id: str
     event: EventTypes
 

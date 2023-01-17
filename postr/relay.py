@@ -1,5 +1,6 @@
 import asyncio
 import websockets
+from pydantic import ValidationError
 from postr.model.messages import parse_message, ParsingException, Message
 import logging
 
@@ -35,10 +36,10 @@ class RelayHub:
 class RelayConnection:
     """Single relay connection"""
 
-    def __init__(self, relay: str, hub: RelayHub, verify_events=True) -> None:
+    def __init__(self, relay: str, hub: RelayHub, validate_events=True) -> None:
         self.relay = relay
         self.hub = hub
-        self.verify_events = verify_events
+        self.validate_events = validate_events
         self.queue = asyncio.Queue()
         self._active = asyncio.Event()
         self._task = None
@@ -82,6 +83,7 @@ class RelayConnection:
                             self.recv_processor(websocket, self.hub.messages),
                         )
                     except websockets.ConnectionClosed:
+                        a = 1+1
                         continue
         except asyncio.CancelledError:
             print("I got cancelled")
@@ -90,12 +92,12 @@ class RelayConnection:
         while True:
             buffer = await websocket.recv()
             try:
-                message = parse_message(buffer)
+                message = parse_message(buffer, validate_events=self.validate_events)
                 await message_queue.put(message)
-            except ParsingException as ex:
+            except (ParsingException, ValidationError) as ex:
                 log.warning("Error parsing message", exc_info=ex)
 
     async def send_processor(self, websocket, send_queue: asyncio.Queue):
         while True:
-            msg = await send_queue.get()
-            await websocket.send(msg)
+            message = await send_queue.get()
+            await websocket.send(message)

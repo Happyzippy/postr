@@ -78,7 +78,6 @@ class RelayConnection:
                             self.recv_processor(websocket, self.hub.messages),
                         )
                     except websockets.ConnectionClosed:
-                        a = 2 + 2
                         continue
         except asyncio.CancelledError:
             print("I got cancelled")
@@ -96,25 +95,3 @@ class RelayConnection:
         while True:
             msg = await send_queue.get()
             await websocket.send(msg)
-
-
-async def here():
-    # Event loop
-    while True:
-        # Try read message from relay with timeout
-        try:
-            buffer = await asyncio.wait_for(websocket.recv(), 1)
-            try:
-                message = parse_message(buffer)
-                await self.hub.messages.put(message)
-            except ParsingException as ex:
-                log.warning("Error parsing message", exc_info=ex)
-        except asyncio.TimeoutError:
-            pass  # No message from relay
-
-        # Try read data to send on connection
-        try:
-            msg = queue.get_nowait()
-            await websocket.send(msg)
-        except asyncio.QueueEmpty:
-            pass  # No waiting data to send

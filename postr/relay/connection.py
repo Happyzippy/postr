@@ -1,8 +1,10 @@
 import asyncio
-import websockets
-from pydantic import ValidationError
-from postr.model.messages import parse_message, ParsingException, Message
 import logging
+
+import websockets
+from postr.model.messages import Message, ParsingException, parse_message
+from postr.relay.retry import connect_with_retry
+from pydantic import ValidationError
 
 log = logging.getLogger(__name__)
 
@@ -18,6 +20,17 @@ class RelayHub:
         return await RelayConnection(relay, self, **kwargs).start()
 
     def publish(self, message, connection=None):
+        # if connection is string, match it to active connections
+        if type(connection) == str:
+            try:
+                connection = next(c for c in self.connections if c.relay == connection)
+            except StopIteration:
+                raise KeyError("Connection not in active connections on this hub")
+        # Check connection is active on hub
+        elif connection is not None:
+            if connection not in self.connections:
+                raise KeyError("Connection not in active connections on this hub")
+
         # If message retrieve payload
         if isinstance(message, Message):
             message = message.payload()
@@ -28,8 +41,6 @@ class RelayHub:
             for connection in self.connections:
                 connection.queue.put_nowait(message)
         else:
-            if connection not in self.connections:
-                raise KeyError("Connection not in active connections on this hub")
             connection.queue.put_nowait(message)
 
 
@@ -75,17 +86,20 @@ class RelayConnection:
             # Register queue with hub
             with self as queue:
                 # Connect and reconnect if closed
-                async for websocket in websockets.connect(self.relay):
-                    try:
-                        # Send and receive data on websocket
-                        await asyncio.gather(
-                            self.send_processor(websocket, self.queue),
-                            self.recv_processor(websocket, self.hub.messages),
-                        )
-                    except websockets.ConnectionClosed:
-                        a = 1+1
-                        continue
-        except asyncio.CancelledError:
+                try:
+                    async for websocket in connect_with_retry(self.relay):
+                        try:
+                            # Send and receive data on websocket
+                            await asyncio.gather(
+                                self.send_processor(websocket, self.queue),
+                                self.recv_processor(websocket, self.hub.messages),
+                            )
+                        except websockets.ConnectionClosed as ex:
+                            a = 1 + 1
+                            continue
+                except Exception as ex:
+                    a = 1 + 1
+        except asyncio.CancelledError as ex:
             print("I got cancelled")
 
     async def recv_processor(self, websocket, message_queue: asyncio.Queue):
@@ -93,6 +107,7 @@ class RelayConnection:
             buffer = await websocket.recv()
             try:
                 message = parse_message(buffer, validate_events=self.validate_events)
+                message.relay = self.relay
                 await message_queue.put(message)
             except (ParsingException, ValidationError) as ex:
                 log.warning("Error parsing message", exc_info=ex)

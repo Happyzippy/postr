@@ -1,4 +1,4 @@
-from postr.model.event import TextNote
+from postr.model.event import TextNote, SetMetadata, RecommendServer
 from postr.model.filter import Filter
 from postr.model.messages import (
     Message,
@@ -6,6 +6,7 @@ from postr.model.messages import (
     SubscriptionResponse,
     RequestMessage,
     CloseMessage,
+    EndOfStoredEventsResponse,
 )
 from postr.user import User
-from postr.relay import RelayHub
+from postr.relay.connection import RelayHub

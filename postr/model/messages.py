@@ -1,8 +1,8 @@
 import json
 from abc import ABC, abstractmethod
 
-from pydantic import BaseModel, validator
-from typing import List
+from pydantic import BaseModel, Field, validator
+from typing import List, Optional
 
 from postr.model.event import EventTypes
 from postr.model.filter import Filter
@@ -10,6 +10,10 @@ from postr.model.filter import Filter
 
 class Message(BaseModel, ABC):
     """Abstract baseclass for messages"""
+
+    relay: Optional[str] = Field(
+        description="Optional metadata field about which relay the message came from"
+    )
 
     @abstractmethod
     def payload(self) -> str:
@@ -36,7 +40,7 @@ class RequestMessage(Message):
             [
                 "REQ",
                 self.subscription_id,
-                *map(lambda x: x.dict(exclude_unset=True), self.filters),
+                *map(lambda x: x.dict(exclude_unset=True, by_alias=True), self.filters),
             ]
         )
 
@@ -72,6 +76,15 @@ class SubscriptionResponse(Message):
         return json.dumps(["EVENT", self.subscription_id, self.event.dict()])
 
 
+class EndOfStoredEventsResponse(Message):
+    """NIP-15: indicates all the events that come after this message are newly published"""
+
+    subscription_id: str
+
+    def payload(self):
+        return json.dumps(["EOSE", self.subscription_id])
+
+
 class ParsingException(Exception):
     """Base class for parsing errors"""
 
@@ -80,7 +93,7 @@ class EventSignatureNotValid(Exception):
     """Event signature could not be validated"""
 
 
-def parse_message(content, validate_events=True):
+def parse_message(content, validate_events=True) -> Message:
     match json.loads(content):
         # Client Requests
         case ["EVENT", event]:
@@ -101,4 +114,6 @@ def parse_message(content, validate_events=True):
             )
         case ["EVENT", subscription_id, event]:
             return SubscriptionResponse(subscription_id=subscription_id, event=event)
+        case ["EOSE", subscription_id]:
+            return EndOfStoredEventsResponse(subscription_id=subscription_id)
     raise ParsingException(f"message could not be parsed, {content}")

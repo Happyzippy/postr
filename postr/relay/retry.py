@@ -1,9 +1,12 @@
 import asyncio
+import logging
 import random
 import websockets
 from typing import AsyncIterator
 from socket import gaierror
 from ssl import SSLCertVerificationError
+
+log = logging.getLogger(__name__)
 
 
 async def connect_with_retry(
